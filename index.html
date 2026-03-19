@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>404 - Sector Empty</title>
+    <!-- Three.js for 3D Space -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Anime.js for UI & Timeline Animation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;800;900&family=Rajdhani:wght@400;600&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --cyan: #00f3ff;
+            --purple: #bc13fe;
+            --red: #ff2a2a;
+            --bg: #030305;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            overflow: hidden;
+            background-color: var(--bg);
+            font-family: 'Rajdhani', sans-serif;
+            color: white;
+            height: 100vh;
+            width: 100vw;
+            user-select: none;
+        }
+
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            touch-action: none;
+            cursor: grab;
+        }
+        
+        #canvas-container:active {
+            cursor: grabbing;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            align-items: center;
+            pointer-events: none;
+            padding-top: 15vh;
+        }
+
+        .message-container {
+            text-align: center;
+            max-width: 800px;
+            padding: 0 20px;
+            perspective: 1000px; 
+            pointer-events: none;
+        }
+
+        .error-code {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 8rem;
+            font-weight: 900;
+            line-height: 1;
+            margin-bottom: 10px;
+            color: transparent;
+            -webkit-text-stroke: 2px var(--cyan);
+            text-shadow: 0 0 20px rgba(0, 243, 255, 0.4);
+            opacity: 0;
+            transform: scale(0.8);
+        }
+
+        .error-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 2rem;
+            letter-spacing: 8px;
+            color: var(--red);
+            text-transform: uppercase;
+            margin-bottom: 30px;
+            opacity: 0;
+            text-shadow: 0 0 10px rgba(255, 42, 42, 0.5);
+        }
+
+        .details p {
+            font-size: 1.2rem;
+            line-height: 1.6;
+            color: #b0b0c0;
+            margin-bottom: 10px;
+            opacity: 0;
+        }
+
+        .details span.highlight {
+            color: var(--cyan);
+            font-weight: 600;
+        }
+
+        .action-btn {
+            pointer-events: auto;
+            margin-top: 40px;
+            display: inline-block;
+            padding: 15px 40px;
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 800;
+            font-size: 1rem;
+            letter-spacing: 3px;
+            color: #fff;
+            background: transparent;
+            border: 1px solid var(--cyan);
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            text-transform: uppercase;
+            transition: all 0.3s ease;
+            opacity: 0;
+            box-shadow: inset 0 0 10px rgba(0, 243, 255, 0.2), 0 0 10px rgba(0, 243, 255, 0.2);
+        }
+
+        .action-btn:hover {
+            background: var(--cyan);
+            color: var(--bg);
+            box-shadow: inset 0 0 20px rgba(0, 243, 255, 0.8), 0 0 30px rgba(0, 243, 255, 0.6);
+            transform: translateY(-2px);
+        }
+
+        /* SVG Spacecraft Draggable Wrapper */
+        #spacecraft-wrapper {
+            position: absolute;
+            top: 75vh;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 220px;
+            z-index: 10;
+            cursor: grab;
+            opacity: 0; 
+            pointer-events: auto;
+            touch-action: none;
+        }
+        
+        #spacecraft-wrapper:active {
+            cursor: grabbing;
+        }
+
+        #spacecraft-container {
+            width: 100%;
+            pointer-events: none;
+            transition: transform 0.1s ease-out;
+            transform-style: preserve-3d;
+            filter: drop-shadow(0 15px 25px rgba(0, 243, 255, 0.15));
+        }
+
+        .thruster-glow {
+            /* Handled by inline transform-origin for precision */
+        }
+        
+        /* Front thrusters initially hidden */
+        .front-thruster {
+            opacity: 0;
+            transform: scaleY(0);
+        }
+
+        /* Dash Fire Animations */
+        @keyframes dash-flow-main {
+            from { stroke-dashoffset: 0; }
+            to { stroke-dashoffset: -30; }
+        }
+        @keyframes dash-flow-side {
+            from { stroke-dashoffset: 0; }
+            to { stroke-dashoffset: -24; }
+        }
+        .dash-fire-main {
+            animation: dash-flow-main 0.3s linear infinite;
+        }
+        .dash-fire-side {
+            animation: dash-flow-side 0.3s linear infinite;
+        }
+
+        @media (max-width: 768px) {
+            .error-code { font-size: 5rem; }
+            .error-title { font-size: 1.2rem; letter-spacing: 4px; }
+            .details p { font-size: 1rem; }
+            #spacecraft-wrapper { width: 140px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 3D Background -->
+    <div id="canvas-container"></div>
+
+    <!-- UI Overlay -->
+    <div id="ui-layer">
+        <div class="message-container">
+            <div class="error-code">404</div>
+            <div class="error-title">Sector Empty</div>
+            
+            <div class="details">
+                <p class="msg-line">System diagnostic complete. Hyper-jump terminated.</p>
+                <p class="msg-line">We followed the requested coordinates, but arrived at a <span class="highlight">null destination</span>.</p>
+                <p class="msg-line">The data you are searching for has been moved, destroyed, or never existed.</p>
+            </div>
+
+            <a href="#" class="action-btn" onclick="window.history.back()">Engage Reverse Thrusters</a>
+        </div>
+    </div>
+    
+    <!-- SVG Spacecraft -->
+    <div id="spacecraft-wrapper">
+        <div id="spacecraft-container">
+            <!-- Adjusted viewBox to accommodate front flames -->
+            <svg viewBox="0 -80 300 400" fill="none" xmlns="http://www.w3.org/2000/svg" overflow="visible">
+                
+                <!-- REVERSE THRUSTERS (FRONT FIRE) -->
+                <g class="front-thruster" id="front-main" style="transform-origin: 150px 40px;">
+                    <line x1="150" y1="40" x2="150" y2="-3000" stroke="url(#front-flame-main)" stroke-width="20" stroke-dasharray="15 15" stroke-linecap="round" class="dash-fire-main" />
+                    <line x1="150" y1="40" x2="150" y2="-3000" stroke="#ffffff" stroke-width="8" stroke-dasharray="15 15" stroke-linecap="round" class="dash-fire-main" />
+                </g>
+                <g class="front-thruster" id="front-l" style="transform-origin: 30px 200px;">
+                    <line x1="30" y1="200" x2="30" y2="-3000" stroke="url(#front-flame-l)" stroke-width="12" stroke-dasharray="12 12" stroke-linecap="round" class="dash-fire-side" />
+                </g>
+                <g class="front-thruster" id="front-r" style="transform-origin: 270px 200px;">
+                    <line x1="270" y1="200" x2="270" y2="-3000" stroke="url(#front-flame-r)" stroke-width="12" stroke-dasharray="12 12" stroke-linecap="round" class="dash-fire-side" />
+                </g>
+
+                <!-- BACK ENGINE GLOWS -->
+                <g class="thruster-glow" id="main-thruster" style="transform-origin: 150px 220px;">
+                    <line x1="150" y1="220" x2="150" y2="350" stroke="url(#back-flame)" stroke-width="20" stroke-dasharray="15 15" stroke-linecap="round" class="dash-fire-main" />
+                    <line x1="150" y1="220" x2="150" y2="280" stroke="#ffffff" stroke-width="8" stroke-dasharray="15 15" stroke-linecap="round" class="dash-fire-main" />
+                </g>
+                <g class="thruster-glow" id="side-thruster-l" style="transform-origin: 85px 190px;">
+                    <line x1="85" y1="190" x2="85" y2="280" stroke="url(#back-flame-side)" stroke-width="12" stroke-dasharray="12 12" stroke-linecap="round" class="dash-fire-side" />
+                </g>
+                <g class="thruster-glow" id="side-thruster-r" style="transform-origin: 215px 190px;">
+                    <line x1="215" y1="190" x2="215" y2="280" stroke="url(#back-flame-side)" stroke-width="12" stroke-dasharray="12 12" stroke-linecap="round" class="dash-fire-side" />
+                </g>
+
+                <!-- Wings -->
+                <path d="M150 80 L30 200 L90 200 L150 140 Z" fill="url(#ship-dark)"/>
+                <path d="M150 80 L270 200 L210 200 L150 140 Z" fill="url(#ship-dark)"/>
+                
+                <!-- Wing Accents -->
+                <path d="M40 190 L90 190 L140 140" stroke="url(#cyan-glow)" stroke-width="2" fill="none"/>
+                <path d="M260 190 L210 190 L160 140" stroke="url(#cyan-glow)" stroke-width="2" fill="none"/>
+
+                <!-- Main Body -->
+                <path d="M150 30 L110 220 L190 220 Z" fill="url(#ship-body)"/>
+                <path d="M150 30 L130 220 L170 220 Z" fill="url(#ship-light)"/>
+
+                <!-- Cockpit -->
+                <path d="M150 90 L135 150 L165 150 Z" fill="url(#glass)"/>
+                <path d="M150 90 L142 150 L150 150 Z" fill="#ffffff" opacity="0.4"/>
+
+                <!-- Details (Back Thruster Nozzles) -->
+                <circle cx="150" cy="180" r="15" fill="#0a0a10" stroke="#00f3ff" stroke-width="2"/>
+                <circle cx="150" cy="180" r="5" fill="#bc13fe"/>
+                
+                <defs>
+                    <!-- Back Thruster Gradients -->
+                    <linearGradient id="back-flame" x1="150" y1="220" x2="150" y2="350" gradientUnits="userSpaceOnUse">
+                        <stop offset="0%" stop-color="#00f3ff"/>
+                        <stop offset="50%" stop-color="#bc13fe"/>
+                        <stop offset="100%" stop-color="transparent"/>
+                    </linearGradient>
+                    <linearGradient id="back-flame-side" x1="0" y1="190" x2="0" y2="280" gradientUnits="userSpaceOnUse">
+                        <stop offset="0%" stop-color="#00f3ff"/>
+                        <stop offset="50%" stop-color="#bc13fe"/>
+                        <stop offset="100%" stop-color="transparent"/>
+                    </linearGradient>
+
+                    <!-- Front (Reverse) Thruster Gradients -->
+                    <linearGradient id="front-flame-main" x1="150" y1="40" x2="150" y2="-3000" gradientUnits="userSpaceOnUse">
+                        <stop offset="0%" stop-color="#ff2a2a"/>
+                        <stop offset="50%" stop-color="#ffaa22"/>
+                        <stop offset="100%" stop-color="transparent"/>
+                    </linearGradient>
+                    <linearGradient id="front-flame-l" x1="30" y1="200" x2="30" y2="-3000" gradientUnits="userSpaceOnUse">
+                        <stop offset="0%" stop-color="#ff2a2a"/>
+                        <stop offset="100%" stop-color="transparent"/>
+                    </linearGradient>
+                    <linearGradient id="front-flame-r" x1="270" y1="200" x2="270" y2="-3000" gradientUnits="userSpaceOnUse">
+                        <stop offset="0%" stop-color="#ff2a2a"/>
+                        <stop offset="100%" stop-color="transparent"/>
+                    </linearGradient>
+
+                    <!-- Ship Materials -->
+                    <linearGradient id="ship-dark" x1="150" y1="80" x2="150" y2="200" gradientUnits="userSpaceOnUse">
+                        <stop offset="0%" stop-color="#1a1a24"/>
+                        <stop offset="100%" stop-color="#05050a"/>
+                    </linearGradient>
+                    <linearGradient id="ship-body" x1="150" y1="30" x2="150" y2="220" gradientUnits="userSpaceOnUse">
+                        <stop offset="0%" stop-color="#2a2a35"/>
+                        <stop offset="100%" stop-color="#0a0a15"/>
+                    </linearGradient>
+                    <linearGradient id="ship-light" x1="150" y1="30" x2="150" y2="220" gradientUnits="userSpaceOnUse">
+                        <stop offset="0%" stop-color="#3a3a45"/>
+                        <stop offset="100%" stop-color="#151520"/>
+                    </linearGradient>
+                    <linearGradient id="glass" x1="150" y1="90" x2="150" y2="150" gradientUnits="userSpaceOnUse">
+                        <stop offset="0%" stop-color="#00f3ff" stop-opacity="0.8"/>
+                        <stop offset="100%" stop-color="#bc13fe" stop-opacity="0.2"/>
+                    </linearGradient>
+                    <linearGradient id="cyan-glow">
+                        <stop offset="0%" stop-color="#00f3ff" stop-opacity="0"/>
+                        <stop offset="50%" stop-color="#00f3ff" stop-opacity="1"/>
+                        <stop offset="100%" stop-color="#00f3ff" stop-opacity="0"/>
+                    </linearGradient>
+                </defs>
+            </svg>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 1. THREE.JS ENVIRONMENT SETUP
+        // ==========================================
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x030305, 0.0005); // Lighter fog for deeper view
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 4000);
+        camera.position.z = 200;
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        container.appendChild(renderer.domElement);
+
+        const flightParams = {
+            warpSpeed: 20,       
+            cameraShake: 2       
+        };
+
+        // --- A. OMNIDIRECTIONAL STARFIELD ---
+        const starCount = 10000;
+        const starRange = 3000; // Massive volume
+        const starGeometry = new THREE.BufferGeometry();
+        const starPositions = new Float32Array(starCount * 3);
+        const starVelocities = new Float32Array(starCount);
+
+        for(let i = 0; i < starCount; i++) {
+            starPositions[i*3] = (Math.random() - 0.5) * starRange;     
+            starPositions[i*3+1] = (Math.random() - 0.5) * starRange;   
+            starPositions[i*3+2] = (Math.random() - 0.5) * starRange;   
+            starVelocities[i] = Math.random() * 0.5 + 0.5;
+        }
+        starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+
+        const createCircleTexture = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = 32;
+            canvas.height = 32;
+            const context = canvas.getContext('2d');
+            context.beginPath();
+            context.arc(16, 16, 16, 0, 2 * Math.PI, false);
+            context.fillStyle = '#ffffff';
+            context.fill();
+            return new THREE.CanvasTexture(canvas);
+        };
+
+        const starMaterial = new THREE.PointsMaterial({
+            color: 0xffffff,
+            size: 2.0, 
+            map: createCircleTexture(),
+            alphaTest: 0.1, 
+            transparent: true,
+            opacity: 0.8,
+            sizeAttenuation: true
+        });
+
+        const starMesh = new THREE.Points(starGeometry, starMaterial);
+        scene.add(starMesh);
+
+        // --- B. MILKY WAY GALAXY ---
+        const mwCount = 15000;
+        const mwGeo = new THREE.BufferGeometry();
+        const mwPos = new Float32Array(mwCount * 3);
+        const mwColors = new Float32Array(mwCount * 3);
+        
+        const cPurple = new THREE.Color(0xbc13fe);
+        const cCyan = new THREE.Color(0x00f3ff);
+        const cWarm = new THREE.Color(0xffaa22);
+
+        for(let i=0; i<mwCount; i++) {
+            const radius = Math.random() * 1200;
+            const theta = Math.random() * Math.PI * 2;
+            // Density creates a slight bulge in the center
+            const thickness = (Math.random() - 0.5) * (1500 / (radius + 20)); 
+            
+            mwPos[i*3] = radius * Math.cos(theta);
+            mwPos[i*3+1] = thickness;
+            mwPos[i*3+2] = radius * Math.sin(theta);
+            
+            // Mix colors from core (warm) to outer edge (cyan/purple)
+            const mix = cPurple.clone().lerp(cCyan, Math.random());
+            if (radius < 300) mix.lerp(cWarm, 1 - (radius/300));
+            
+            mwColors[i*3] = mix.r;
+            mwColors[i*3+1] = mix.g;
+            mwColors[i*3+2] = mix.b;
+        }
+
+        mwGeo.setAttribute('position', new THREE.BufferAttribute(mwPos, 3));
+        mwGeo.setAttribute('color', new THREE.BufferAttribute(mwColors, 3));
+
+        const mwMat = new THREE.PointsMaterial({
+            size: 5.0,
+            map: createCircleTexture(),
+            transparent: true,
+            opacity: 0.15,
+            vertexColors: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+        });
+
+        const milkyWay = new THREE.Points(mwGeo, mwMat);
+        milkyWay.rotation.x = Math.PI / 3; // Tilt the galaxy
+        milkyWay.rotation.z = Math.PI / 6;
+        scene.add(milkyWay);
+
+        // Distant Planet
+        const planetGeo = new THREE.SphereGeometry(60, 32, 32);
+        const planetMat = new THREE.MeshBasicMaterial({ color: 0x110022, wireframe: true, transparent: true, opacity: 0 });
+        const planet = new THREE.Mesh(planetGeo, planetMat);
+        planet.position.set(200, 50, -600);
+        scene.add(planet);
+
+
+        // ==========================================
+        // 2. THREE.JS RENDER LOOP
+        // ==========================================
+        function animateThree() {
+            requestAnimationFrame(animateThree);
+
+            const positions = starMesh.geometry.attributes.position.array;
+
+            // Move stars forward to create flight illusion in all directions
+            for(let i = 0; i < starCount; i++) {
+                positions[i*3+2] += flightParams.warpSpeed * starVelocities[i];
+
+                // Wrap stars seamlessly across the massive volume
+                if (positions[i*3+2] > starRange/2) {
+                    positions[i*3+2] -= starRange;
+                    positions[i*3] = (Math.random() - 0.5) * starRange;
+                    positions[i*3+1] = (Math.random() - 0.5) * starRange;
+                }
+            }
+            starMesh.geometry.attributes.position.needsUpdate = true;
+
+            // Slowly rotate the Milky Way
+            milkyWay.rotation.y += 0.0002;
+
+            // Camera Shake based on warp speed
+            if (flightParams.cameraShake > 0) {
+                camera.position.x = (Math.random() - 0.5) * flightParams.cameraShake;
+                camera.position.y = (Math.random() - 0.5) * flightParams.cameraShake;
+            } else {
+                camera.position.x += (0 - camera.position.x) * 0.1;
+                camera.position.y += (0 - camera.position.y) * 0.1;
+            }
+
+            planet.rotation.y += 0.002;
+            planet.rotation.z += 0.001;
+
+            renderer.render(scene, camera);
+        }
+        animateThree();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+
+        // ==========================================
+        // 3. ANIME.JS TIMELINE (CINEMATIC INTRO)
+        // ==========================================
+        const tl = anime.timeline({ easing: 'easeOutExpo' });
+
+        tl.add({
+            targets: '#spacecraft-wrapper',
+            top: ['100vh', '75vh'],
+            opacity: [0, 1],
+            duration: 2000,
+            easing: 'easeOutQuint'
+        });
+        
+        anime({
+            targets: '.thruster-glow', 
+            scaleY: [1, 1.3, 0.9, 1.5, 1],
+            duration: 200,
+            loop: 10, 
+            easing: 'linear'
+        });
+
+        tl.add({
+            targets: flightParams,
+            warpSpeed: 0.5,      
+            cameraShake: 0,      
+            duration: 3500,
+            easing: 'easeOutCubic',
+            update: function(anim) {
+                if(!isDraggingShip) { 
+                    const scale = 1 - (anim.progress / 100) * 0.6; 
+                    const thrusters = document.querySelectorAll('.thruster-glow');
+                    thrusters.forEach(t => t.style.transform = `scaleY(${scale})`);
+                }
+            }
+        }, '+=500');
+
+        tl.add({ targets: planetMat, opacity: 0.3, duration: 2000, easing: 'linear' }, '-=2000');
+
+        tl.add({ targets: '.error-code', opacity: [0, 1], scale: [0.8, 1], duration: 1000, easing: 'spring(1, 80, 10, 0)' }, '-=500')
+          .add({ targets: '.error-title', opacity: [0, 1], translateY: [-20, 0], duration: 800 }, '-=600')
+          .add({ targets: '.msg-line', opacity: [0, 1], translateX: [-30, 0], delay: anime.stagger(300), duration: 800, easing: 'easeOutQuad' }, '-=200')
+          .add({ targets: '.action-btn', opacity: [0, 1], translateY: [20, 0], duration: 1000 });
+
+        setTimeout(() => {
+            anime({
+                targets: '#spacecraft-container svg', 
+                translateY: '-15px', direction: 'alternate', loop: true, easing: 'easeInOutSine', duration: 2000
+            });
+        }, 2000);
+
+
+        // ==========================================
+        // 4. INTERACTIVITY: 360 SKY & REVERSE THRUSTERS
+        // ==========================================
+        
+        // --- A. Sky Rotation Logic ---
+        let isDraggingSky = false;
+        let prevSkyTouch = { x: 0, y: 0 };
+        let camYaw = 0;
+        let camPitch = 0;
+        const canvasEl = document.getElementById('canvas-container');
+
+        canvasEl.addEventListener('pointerdown', (e) => {
+            isDraggingSky = true;
+            prevSkyTouch = { x: e.clientX, y: e.clientY };
+        });
+
+        // --- B. Spacecraft Drag & Reverse Fire Logic ---
+        const shipWrapper = document.getElementById('spacecraft-wrapper');
+        const shipContainer = document.getElementById('spacecraft-container');
+        let isDraggingShip = false;
+        let prevShipTouch = { x: 0, y: 0 };
+
+        shipWrapper.addEventListener('pointerdown', (e) => {
+            isDraggingShip = true;
+            prevShipTouch = { x: e.clientX, y: e.clientY };
+            e.stopPropagation();
+
+            // ACTIVATE FRONT (REVERSE) THRUSTERS
+            anime.remove('.front-thruster');
+            anime.remove('.thruster-glow');
+            
+            // Blast fire out of the front
+            anime({
+                targets: '.front-thruster',
+                scaleY: [0, 1.5],
+                opacity: [0, 1],
+                duration: 200,
+                easing: 'easeOutQuad'
+            });
+
+            // Turn off back thrusters
+            anime({
+                targets: '.thruster-glow',
+                scaleY: 0,
+                opacity: 0,
+                duration: 200,
+                easing: 'easeOutQuad'
+            });
+
+            anime({ targets: shipContainer, scale: 1.05, duration: 300, easing: 'easeOutQuad' });
+        });
+
+        // --- C. Global Pointer Move / Up ---
+        document.addEventListener('pointermove', (e) => {
+            if (isDraggingSky) {
+                const deltaX = e.clientX - prevSkyTouch.x;
+                const deltaY = e.clientY - prevSkyTouch.y;
+
+                camYaw -= deltaX * 0.004;
+                camPitch -= deltaY * 0.004;
+                
+                // Allow looking in all directions (YXZ)
+                camera.rotation.set(camPitch, camYaw, 0, 'YXZ');
+                prevSkyTouch = { x: e.clientX, y: e.clientY };
+            }
+
+            if (isDraggingShip) {
+                const deltaX = e.clientX - prevShipTouch.x;
+                const deltaY = e.clientY - prevShipTouch.y;
+                
+                const currentLeft = parseFloat(getComputedStyle(shipWrapper).left);
+                const currentTop = parseFloat(getComputedStyle(shipWrapper).top);
+                
+                shipWrapper.style.left = (currentLeft + deltaX) + 'px';
+                shipWrapper.style.top = (currentTop + deltaY) + 'px';
+                
+                prevShipTouch = { x: e.clientX, y: e.clientY };
+            }
+
+            if (tl.progress > 50 && !isDraggingShip) {
+                const xAxis = (window.innerWidth / 2 - e.clientX) / 40;
+                const yAxis = (window.innerHeight / 2 - e.clientY) / 40;
+                shipContainer.style.transform = `rotateY(${-xAxis}deg) rotateX(${yAxis}deg)`;
+            }
+        });
+
+        const handlePointerUp = () => {
+            isDraggingSky = false;
+
+            if (isDraggingShip) {
+                isDraggingShip = false;
+                
+                // Turn OFF Front Thrusters
+                anime.remove('.front-thruster');
+                anime.remove('.thruster-glow');
+
+                anime({
+                    targets: '.front-thruster',
+                    scaleY: 0,
+                    opacity: 0,
+                    duration: 400,
+                    easing: 'easeOutQuad'
+                });
+
+                // Return Back Thrusters to idle state
+                anime({
+                    targets: '.thruster-glow',
+                    scaleY: 0.4,
+                    opacity: 0.8,
+                    duration: 400,
+                    easing: 'easeOutQuad'
+                });
+
+                anime({ targets: shipContainer, scale: 1, duration: 400, easing: 'easeOutQuad' });
+            }
+        };
+
+        document.addEventListener('pointerup', handlePointerUp);
+        document.addEventListener('pointercancel', handlePointerUp);
+
+    </script>
+</body>
+</html>
